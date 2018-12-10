@@ -1,0 +1,281 @@
+
+#Biodiversity in forest fragments of the Mache-Chindul Ecological Reserve, Ecuador
+
+#Data description:
+
+For my project I used camera trap data collected in the Mache-Chindul of NW Ecuador, an ecological reserve characterized by high levels of fragmentation. Camera traps were placed in 22 forest fragments throughout the Mache-Chindul Ecological Reserve and the Bilsa Biological Reserve. Species of interest are terrestrial birds and mammals.
+
+Originally, I began with three different data spreadsheets. The spreadsheets were created by a collaborator using sampling effort data and species detection data. One of the original three spreadsheets, entitled "species identification" displayed all species, mammals and birds, detected during the study, along with the trapping period (when the camera was placed out in the field) during which it was detected. Another spreadsheet entitled "camera information" listed the various camera trapping periods, along with the habitat variables at that site for each trapping period. It included variables such as canopy height (CAN), canopy openness (SCOPE), TEN, FIFTY, etc. The third called "fragment habitat summary" listed the fragments along with fragment-level variables (same variables as the habitat variables but these are in caps (SCOPE, FIFTY, etc.).
+
+I used commonalities between the spreadsheets (fragment and trapping period) to link them into one dataset called "species_detection". Because many of the bird species were unknown at the time, I filtered out the bird data so that I was just working with the mammal data. I called this new dataset "species_no_birds". This is the dataset I worked with for my project.
+
+The variables in my data are trapping_period, species, n_animals, AREA, ELEV, SCOPE, COVER_2000_1KM, CAN, TEN and FIFTY. For these 10 columns, I have 1817 rows or observations. The trapping period refers to the period of time for which a camera was placed in the field. AREA refers to the area of the fragments. ELEV (elevation) refers to the elevation of the fragment. The SCOPE (canopy scope) refers to the openness of the canopy of the fragment. COVER_2000_1KM refers to the percent of forest cover in a 1km radius from forest fragment. CAN (canopy height) refers to the height of the tallest tree in each fragment. Ten refers to the number of trees > 10 cm dbh in 5 m radius around the camera. Fifty is the number of trees > 50 cm dbh in 5 m radius around the camera.
+
+##Project goals:
+The purpose of this project is to better understand what species are able to survive in these forest fragments. Originally, I did not have a hypothesis. Instead, I began by exploring the data to find patterns in species occurrence in relation to fragment-level vegetative characteristics like canopy scope, area of fragment, etc.
+
+
+##Data summary:
+```{r}
+library("tidyverse")
+
+```
+
+```{r}
+#Reading in camer_info data.frame
+
+
+camera_info <- read_csv("Data/camera information 2018_09_08.csv")
+
+#Selecting only variables I am interested in
+camera_info <- camera_info %>% 
+select(trapping_period, fragment)
+
+#Reading in species_detection data.frame
+
+species_detection <- read_csv("Data/species detection data 2018_09_08.csv")
+
+#Selecting only variables I am interested in
+species_detection <- species_detection %>% 
+select(trapping_period, species, class)
+
+#Reading in frag_summary data.frame
+
+frag_summary <- read_csv("Data/Fragment habitat summary 2015_08_08.csv")
+
+#Selecting only variables I am interested in 
+frag_summary <-frag_summary %>% 
+select(fragment, AREA, TEN, FIFTY, SCOPE, ELEV, CAN, COVER_2000_1KM)
+
+#Filtering out birds, creating surveys_no_birds data.frame
+
+surveys_no_birds <- species_detection %>%
+  filter(class=="mammal") %>% 
+  select(-class)
+  
+#Merging the camera info into species trapping data.frames with join. Another way to do this is with for loop
+
+surveys_no_birds <- left_join(surveys_no_birds,camera_info)
+surveys_no_birds <-left_join(surveys_no_birds, frag_summary)
+```
+
+##Exploring the data
+
+###Figure 1: Total camera detections in all fragments
+
+```{r}
+frag_plot <- ggplot(data=surveys_no_birds,
+mapping= aes(x=fragment, y=n_distinct(species), fill=species))+
+geom_bar(stat="identity", alpha=0.8)+
+labs(title= "Total camera detections per fragment",
+   x="fragment #",
+   y="total camera detections")
+plot(frag_plot)
+```
+
+*This graph shows that fragment 23 had the greatest total camera detections. The colors represent the individual species "trapped" and thus this graph also serves as a visual for species richness (# of distinct species) within each fragment. Now I want a more accurate portrayl of species richness within each fragment.*
+
+
+**Summarize by fragment to see the number of distinct species in each fragment** 
+```{r}
+frag<-surveys_no_birds %>% 
+group_by(fragment,AREA,TEN,FIFTY,SCOPE,ELEV,CAN,COVER_2000_1KM) %>% 
+summarize(richness=n_distinct(species)) %>% 
+select(fragment,richness,AREA,TEN,FIFTY,SCOPE,ELEV,CAN,COVER_2000_1KM)
+```
+
+### Figure 2: Species richness (# of individual species) in all fragments 
+
+```{r}
+richnessfrag_plot <- ggplot(data=frag,
+mapping= aes(x=fragment, y=richness, fill=richness))+
+geom_bar(stat="identity", alpha=0.8)+
+labs(title= "Species richness per fragment",
+   x="fragment #",
+   y="Individual species (richness)")
+plot(richnessfrag_plot)
+```
+
+*This graph shows the number of unique species in each fragment. The shading is representative of "richness" within each fragment where the lightest are the richest and the darkest are the least rich. Fragment 12 and 75 appear to be the richest, while fragment 89 is the least. I now want to explore other variables to begin to reason why some fragments are richer than others.*
+
+### Figure 3: Area of each fragment 
+
+```{r}
+AREA_plot <- ggplot(data=surveys_no_birds,
+mapping= aes(x=fragment, y=AREA, fill=AREA))+
+geom_bar(stat="identity", alpha=0.8)+
+labs(title= "Area of each fragment",
+   x="fragment #",
+   y="Area of fragment")
+plot(AREA_plot)
+```
+
+*This graph was suprising and interesting! We can see clearly that the Bilsa fragment has the greatest area, which makes sense because it is a biological station. Of the other fragemnts, the two with the greatest area were fragment 23 and fragment 75. It is cool to see that fragment 75 had the greatest species richness and was one of the greatest in area. It would be interesting to do an ANOVA comparing AREA to richness.*
+
+### Figure 4: TEN (Number of trees > 10 cm dbh in 5 m radius) per fragment 
+
+```{r}
+TEN_plot <- ggplot(data=surveys_no_birds,
+  mapping= aes(x=fragment, y=TEN, fill=TEN)) +
+  geom_bar(stat="identity", alpha=0.8)+
+  labs(title= "TEN per fragment",
+   x="fragment #",
+   y="TEN")
+plot(TEN_plot)
+```
+
+*From this graph we can see that fragment 23 by far has the greatest amount of trees greater than 10 dbh within a 5 m radius of the fragment. It makes sense that fragment 23 would have the some of the largest trees because of its greater area. It is interesting to see that 89 hardly has any as this was the fragment with the least richness as well.*
+
+### Figure 5: FIFTY (Number of trees > 50 cm dbh in 5 m radius) per fragment 
+
+```{r}
+FIFTY_plot <- ggplot(data=surveys_no_birds,
+  mapping= aes(x=fragment, y=FIFTY, fill=FIFTY)) +
+  geom_bar(stat="identity", alpha=0.8)+
+  labs(title= "FIFTY per fragment",
+   x="fragment #",
+   y="FIFTY")
+plot(FIFTY_plot)
+```
+
+*For this graph, we see just about the same pattern as we do for TEN.*
+
+### Figure 6: SCOPE (canopy openess) of each fragment
+
+```{r}
+SCOPE_plot <- ggplot(data= surveys_no_birds,
+  mapping= aes(x=fragment, y=SCOPE,fill=SCOPE)) +
+   geom_bar(stat="identity", alpha=0.8)+
+   labs(title= "Canopy SCOPE (openess) of each fragment",
+   x="fragment #",
+   y="Canopy SCOPE")
+plot(SCOPE_plot)
+```
+
+*This was the most suprising of all the figures so far. We would assume that canopy openess would be negativley coorelated with species richness, but in the case of our data, it is actually positivley correlated. Plot 89 had the narrowest canopy and least species richness; whereas, plot 87 had the widest canopy and a medium amount of species richness and plot 75 had one of the widest canopies and the greatest species richness.* 
+
+
+### Figure 7: Elevation of each fragment
+
+```{r}
+ELEV_plot <- ggplot(data=surveys_no_birds,
+mapping= aes(x=fragment, y=ELEV, fill=ELEV))+
+geom_bar(stat="identity", alpha=0.8)+
+labs(title= "Elevation of each fragment",
+   x="fragment #",
+   y="fragment elevation")
+plot(ELEV_plot)
+```
+
+### Figure 8: Canopy height of each fragment
+
+```{r}
+CAN_plot <- ggplot(data=surveys_no_birds,
+mapping= aes(x=fragment, y=CAN, fill=CAN))+
+geom_bar(stat="identity", alpha=0.8)+
+labs(title= "Canopy height of each fragment",
+    x="fragment #",
+    y="canopy height")
+plot(CAN_plot)
+```
+
+### Figure 9: COVER_2000_1KM refers to the percent of forest cover in a 1km radius from forest fragment
+
+```{r}
+COVER_2000_1KM_plot <-ggplot(data=surveys_no_birds,
+mapping= aes(x=fragment, y=COVER_2000_1KM, fill=COVER_2000_1KM))+
+geom_bar(stat="identity", alpha=0.8)+
+labs(title= "COVER_2000_1KM of each fragment",
+    x="fragment #",
+    y="COVER_2000_1KM")
+plot(COVER_2000_1KM_plot)
+```
+
+*At this point since I have ploted all environemntal variables, I have made some interesting observations. For one, fragment 75 had the greatest species richness and one of the greatest scores for all environemnmental variables. Similarly, fragment 89 had the least species richness and one of the lowest scores for all environemntal variables. This would imply that environemntal variables do indeed have a significant affect on species richness. Interestingy, this was not the case for fragment 12 which was tied with fragment 75 for having the greatest species richness, has had an average score for all of the environmental variables so far, including canopy height. Similarlly, fragment 23 had high score for all of the variables but had a middle amount of species richness. Now that I have explored all of the variables that could potentially contribute to species richness within each fragment. I want to run some statystical tests to determine which most significantly relate to species richness.*  
+
+##Analysis(ANOVA)
+
+
+### ANOVA 1: AREA~richness 
+
+```{r}
+aov.first= aov(AREA~richness, data= frag)#error??
+summary(aov.first)
+print(model.tables(aov.first, "means"), digits=3)#report the means
+boxplot(AREA~richness, data=frag)
+```
+
+*This had a p-value of .54 so not a significant relationship*
+
+### ANOVA 2: TEN~richness 
+
+```{r}
+aov.second= aov(TEN~richness+Error(fragment/TEN), data= frag)#error??
+summary(aov.second)
+print(model.tables(aov.second, "means"), digits=3)
+boxplot(TEN~richness, data=frag)
+```
+
+*This had a p-value of .16 so not a significant relationship*
+
+### ANOVA 3: FIFTY~richness 
+
+```{r}
+aov.third= aov(FIFTY~richness, data= frag)
+summary(aov.third)
+print(model.tables(aov.third, "means"),digits=3)
+boxplot(FIFTY~richness, data=frag) 
+```
+
+*This had a p-value of .25 so not a significant relationship*
+
+### ANOVA 4: SCOPE~richness 
+
+```{r}
+aov.forth= aov(SCOPE~richness,data= frag)
+summary(aov.forth)
+print(model.tables(aov.forth, "means"),digits=3) 
+boxplot(SCOPE~richness, data=frag) 
+```
+
+*This was a significant relationship* 
+
+### ANOVA 5: ELEV~richness
+```{r}
+aov.fifth= aov(ELEV~richness, data=frag)
+summary(aov.fifth)
+print(model.tables(aov.fifth, "means"), digits=3)
+boxplot(ELEV~richness, data= frag)
+```
+
+*This was a significant relationship*
+
+### ANOVA 6: CAN~richness
+
+```{r}
+aov.sixth= aov(CAN~richness, data=frag)
+summary(aov.sixth)
+print(model.tables(aov.sixth, "means"), digits=3)
+boxplot(CAN~richness, data= frag)
+```
+
+*This had a p-value of .13 so was not significant*
+
+### ANOVA 7: COVER_2000_1KM~richness
+
+```{r}
+aov.seventh= aov(COVER_2000_1KM~richness, data=frag)
+summary(aov.seventh)
+print(model.tables(aov.seventh, "means"), digits=3)
+boxplot(COVER_2000_1KM~richness, data= frag)
+```
+
+*This was a significant relationship*
+
+##Summary of stats (stats were done by Tadeo Ramirez):
+
+Fragment elevation, mean canopy openness, and forest cover in the surrounding matrix predict higher spp richness of terrestrial mammals, while the number of cameras deployed in a fragment predicted lower spp counts. Forest cover and elevation has the highest predictive power, while canopy openness and # of camera traps deployed exhibit coefficients of about half the magnitude.  Overall, the model explains a significant percentage of the variation in our data (R2 = 0.825). 
+
+##Future directions: 
+
+At this point, we have finalized IDing all avian species and Tadeo will now run the same stats as he did for the mammal data for the birds. In the mean time, I will be consulting literature to see if I can find an explanation for why canopy openness predicts higher species richness in the forest fragments and if elevation or distance to continuous forest is generally a greater predictor of species richness in forest fragments. 
